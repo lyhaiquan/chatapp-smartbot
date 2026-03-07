@@ -20,9 +20,11 @@ const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
         origin: allowedOrigins,
+        methods: ['GET', 'POST'],
         credentials: true,
     },
     maxHttpBufferSize: 1e8, // 100MB cho file transfer
+    transports: ['websocket', 'polling'],
 });
 
 // Expose io to HTTP controllers (for real-time notifications from REST routes)
