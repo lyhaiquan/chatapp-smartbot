@@ -77,7 +77,7 @@ app.get('/api/ice-servers', async (req, res) => {
         const meteredApiKey = process.env.METERED_API_KEY;
         if (meteredApiKey) {
             const response = await fetch(
-                `https://smart-ai-chat.metered.live/api/v1/turn/credentials?apiKey=${encodeURIComponent(meteredApiKey)}`
+                `https://phucanh.metered.live/api/v1/turn/credentials?apiKey=${encodeURIComponent(meteredApiKey)}`
             );
             if (response.ok) {
                 const turnServers = await response.json();
