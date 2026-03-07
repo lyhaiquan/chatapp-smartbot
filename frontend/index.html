@@ -8,7 +8,7 @@
   <title>Smart AI Chat</title>
   <script>
     window.global = window.global || window;
-    window.process = window.process || { env: {} };
+    window.process = window.process || { env: {}, nextTick: function(fn) { setTimeout(fn, 0); } };
   </script>
 </head>
 
