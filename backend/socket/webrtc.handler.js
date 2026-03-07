@@ -88,7 +88,11 @@ module.exports = (io, socket) => {
             console.log(`✅ ${socket.user.username} accepted call in room ${roomId}`);
 
             const call = activeCalls.get(roomId);
-            if (call) {
+            if (!call) {
+                return socket.emit('call:error', { roomId, error: 'Cuộc gọi đã kết thúc hoặc không tồn tại' });
+            }
+            
+            if (!call.participants.includes(userId)) {
                 call.participants.push(userId);
             }
 
@@ -97,6 +101,7 @@ module.exports = (io, socket) => {
                 io.to(callerSocketId).emit('call:accepted', {
                     roomId,
                     userId,
+                    acceptorId: userId, // Alias rõ ràng cho frontend dễ dùng
                     username: socket.user.username,
                 });
             }
@@ -194,38 +199,46 @@ module.exports = (io, socket) => {
     // ─── webrtc:offer ──────────────────────────────────────────────────
     socket.on('webrtc:offer', async ({ targetUserId, sdp }) => {
         console.log(`📡 [OFFER] ${socket.user.username} (${userId}) → target ${targetUserId}`);
+        if (!targetUserId || !sdp) return;
+
         const targetSocketId = await getSocketId(targetUserId);
-        console.log(`📡 [OFFER] targetSocketId resolved: ${targetSocketId}`);
+        
         if (targetSocketId) {
             io.to(targetSocketId).emit('webrtc:offer', {
                 fromUserId: userId,
                 sdp,
+                type: 'offer'
             });
-            console.log(`📡 [OFFER] Relayed to ${targetSocketId}`);
         } else {
             console.log(`❌ [OFFER] Target ${targetUserId} has no socketId!`);
+            socket.emit('webrtc:error', { code: 'USER_OFFLINE', message: 'Không thể kết nối tới người dùng này' });
         }
     });
 
     // ─── webrtc:answer ─────────────────────────────────────────────────
     socket.on('webrtc:answer', async ({ targetUserId, sdp }) => {
         console.log(`📡 [ANSWER] ${socket.user.username} (${userId}) → target ${targetUserId}`);
+        if (!targetUserId || !sdp) return;
+
         const targetSocketId = await getSocketId(targetUserId);
-        console.log(`📡 [ANSWER] targetSocketId resolved: ${targetSocketId}`);
+        
         if (targetSocketId) {
             io.to(targetSocketId).emit('webrtc:answer', {
                 fromUserId: userId,
                 sdp,
+                type: 'answer'
             });
-            console.log(`📡 [ANSWER] Relayed to ${targetSocketId}`);
         } else {
             console.log(`❌ [ANSWER] Target ${targetUserId} has no socketId!`);
+            socket.emit('webrtc:error', { code: 'USER_OFFLINE', message: 'Không thể gửi phản hồi kết nối' });
         }
     });
 
     // ─── webrtc:ice-candidate ──────────────────────────────────────────
     socket.on('webrtc:ice-candidate', async ({ targetUserId, candidate }) => {
-        console.log(`🧳 [ICE] ${socket.user.username} (${userId}) → target ${targetUserId}`);
+        // Log mức độ thấp hơn hoặc bỏ qua để tránh spam console, nhưng giữ kiểm tra
+        if (!targetUserId || !candidate) return;
+
         const targetSocketId = await getSocketId(targetUserId);
         if (targetSocketId) {
             io.to(targetSocketId).emit('webrtc:ice-candidate', {
@@ -233,7 +246,8 @@ module.exports = (io, socket) => {
                 candidate,
             });
         } else {
-            console.log(`❌ [ICE] Target ${targetUserId} has no socketId!`);
+            // Không emit error ở đây để tránh spam client khi ICE candidate đến dồn dập
+            console.warn(`⚠️ [ICE] Failed to relay candidate from ${socket.user.username} to ${targetUserId}`);
         }
     });
 

@@ -73,6 +73,7 @@ app.get('/api/health', (req, res) => {
 // ─── ICE Servers (TURN/STUN for WebRTC) ───────────────────────────────
 app.get('/api/ice-servers', async (req, res) => {
     try {
+        console.log(`❄️  ICE Servers requested by ${req.ip}`);
         const iceServers = [
             { urls: 'stun:stun.l.google.com:19302' },
             { urls: 'stun:stun1.l.google.com:19302' },
