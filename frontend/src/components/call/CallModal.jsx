@@ -41,7 +41,7 @@ export default function CallModal() {
         }
     }, [localStream]);
 
-    // ── Attach remote stream to video element (video calls) ────
+    // ── Attach remote stream to video element ────────────────────
     useEffect(() => {
         const el = remoteVideoRef.current;
         if (!el) return;
@@ -49,27 +49,23 @@ export default function CallModal() {
             console.log('[CallModal] Assigning remoteStream to <video>, tracks:',
                 remoteStream.getTracks().map(t => `${t.kind}:${t.readyState}`).join(', '));
             el.srcObject = remoteStream;
-            el.play().catch(() => { });
+            el.play().catch((e) => console.warn('[CallModal] video play blocked:', e.message));
         } else {
             el.srcObject = null;
         }
     }, [remoteStream]);
 
-    // ── Attach remote stream to audio element (voice calls only) ────
+    // ── Attach remote stream to audio element (backup for voice calls) ────
     useEffect(() => {
         const el = remoteAudioRef.current;
         if (!el) return;
-        const isVideo = callState.callType === 'video';
-        // Only use <audio> for non-video calls; video element handles audio too
-        if (remoteStream && !isVideo) {
-            console.log('[CallModal] Assigning remoteStream to <audio>, tracks:',
-                remoteStream.getAudioTracks().map(t => `${t.kind}:${t.readyState}`).join(', '));
+        if (remoteStream) {
             el.srcObject = remoteStream;
-            el.play().catch(() => { });
+            el.play().catch((e) => console.warn('[CallModal] audio play blocked:', e.message));
         } else {
             el.srcObject = null;
         }
-    }, [remoteStream, callState.callType]);
+    }, [remoteStream]);
 
     // ── Call timer ──────────────────────────────────────────────
     useEffect(() => {
@@ -113,16 +109,14 @@ export default function CallModal() {
                 {/* ─── Hidden audio element: ALWAYS rendered to play remote audio ─── */}
                 <audio ref={remoteAudioRef} autoPlay playsInline />
 
-                {/* ─── Remote video: ALWAYS rendered, never unmounted ─── */}
-                {isVideoCall && (
-                    <video
-                        ref={remoteVideoRef}
-                        autoPlay
-                        playsInline
-                        className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${hasRemote ? 'opacity-100' : 'opacity-0'
-                            }`}
-                    />
-                )}
+                {/* ─── Remote video: ALWAYS rendered so it can play audio too ─── */}
+                <video
+                    ref={remoteVideoRef}
+                    autoPlay
+                    playsInline
+                    className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${hasRemote && isVideoCall ? 'opacity-100' : 'opacity-0 pointer-events-none'
+                        }`}
+                />
 
                 {/* ─── Overlay: avatar / "Đang gọi" / duration (shown when no remote stream) ─── */}
                 {(!hasRemote || !isVideoCall) && (

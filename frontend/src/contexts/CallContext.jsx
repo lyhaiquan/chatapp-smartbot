@@ -195,9 +195,9 @@ export function CallProvider({ children }) {
             console.log('[Peer] Connection closed');
         });
 
-        // Monitor ICE connection state for failure detection
+        // Monitor ICE connection state — use addEventListener to NOT override SimplePeer's internal handler
         if (peer._pc) {
-            peer._pc.oniceconnectionstatechange = () => {
+            peer._pc.addEventListener('iceconnectionstatechange', () => {
                 const state = peer._pc.iceConnectionState;
                 console.log('[Peer] ICE state:', state);
                 if (state === 'failed') {
@@ -206,7 +206,7 @@ export function CallProvider({ children }) {
                 } else if (state === 'disconnected') {
                     console.warn('[Peer] ICE disconnected — attempting reconnect...');
                 }
-            };
+            });
         }
 
         peerRef.current = peer;
