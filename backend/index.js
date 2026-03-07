@@ -19,7 +19,12 @@ const server = http.createServer(app);
 // ─── Khởi tạo Socket.io ──────────────────────────────────────────────
 const io = new Server(server, {
     cors: {
-        origin: allowedOrigins,
+        origin: function (origin, callback) {
+            if (!origin) return callback(null, true);
+            if (allowedOrigins.includes(origin)) return callback(null, true);
+            if (/\.vercel\.app$/.test(origin)) return callback(null, true);
+            callback(new Error('Not allowed by CORS'));
+        },
         methods: ['GET', 'POST'],
         credentials: true,
     },
