@@ -65,6 +65,54 @@ app.get('/api/health', (req, res) => {
     });
 });
 
+// ─── ICE Servers (TURN/STUN for WebRTC) ───────────────────────────────
+app.get('/api/ice-servers', async (req, res) => {
+    try {
+        const iceServers = [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' },
+        ];
+
+        // If Metered.ca API key is configured, fetch real TURN credentials
+        const meteredApiKey = process.env.METERED_API_KEY;
+        if (meteredApiKey) {
+            const response = await fetch(
+                `https://smart-ai-chat.metered.live/api/v1/turn/credentials?apiKey=${encodeURIComponent(meteredApiKey)}`
+            );
+            if (response.ok) {
+                const turnServers = await response.json();
+                iceServers.push(...turnServers);
+                console.log(`✅ Fetched ${turnServers.length} TURN servers from Metered.ca`);
+            } else {
+                console.warn('⚠️ Failed to fetch Metered TURN credentials:', response.status);
+            }
+        }
+
+        // Manual TURN server from env vars
+        const turnUrl = process.env.TURN_URL;
+        const turnUser = process.env.TURN_USERNAME;
+        const turnCred = process.env.TURN_CREDENTIAL;
+        if (turnUrl) {
+            iceServers.push({
+                urls: turnUrl.split(',').map(u => u.trim()),
+                username: turnUser || '',
+                credential: turnCred || '',
+            });
+        }
+
+        res.json({ iceServers });
+    } catch (error) {
+        console.error('ICE servers error:', error.message);
+        // Return STUN-only as fallback
+        res.json({
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' },
+            ],
+        });
+    }
+});
+
 // ─── Error Handler ────────────────────────────────────────────────────
 app.use(errorHandler);
 

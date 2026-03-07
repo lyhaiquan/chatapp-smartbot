@@ -14,6 +14,38 @@ const getSimplePeer = async () => {
     return SimplePeerClass;
 };
 
+// ── Fetch ICE servers from backend (cached) ──────────────────────
+let cachedIceServers = null;
+let iceServersFetchedAt = 0;
+const ICE_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+const fetchIceServers = async () => {
+    // Return cache if still fresh
+    if (cachedIceServers && (Date.now() - iceServersFetchedAt) < ICE_CACHE_TTL) {
+        return cachedIceServers;
+    }
+    try {
+        const apiBase = import.meta.env.VITE_API_URL || '/api';
+        const res = await fetch(`${apiBase}/ice-servers`);
+        if (res.ok) {
+            const data = await res.json();
+            if (data.iceServers?.length > 0) {
+                cachedIceServers = data.iceServers;
+                iceServersFetchedAt = Date.now();
+                console.log('[Call] Fetched ICE servers from backend:', data.iceServers.length, 'entries');
+                return data.iceServers;
+            }
+        }
+    } catch (err) {
+        console.warn('[Call] Failed to fetch ICE servers from backend:', err.message);
+    }
+    // Fallback: STUN only
+    return [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+    ];
+};
+
 export function CallProvider({ children }) {
     const { on, off, emit } = useSocket();
     const { user } = useAuth();
@@ -99,55 +131,14 @@ export function CallProvider({ children }) {
         const SimplePeer = await getSimplePeer();
         console.log(`[Call] createPeer(initiator=${initiator}), target=${targetUserIdRef.current}`);
 
-        // Build ICE servers: STUN + TURN for NAT traversal
-        const iceServers = [
-            { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:stun1.l.google.com:19302' },
-        ];
+        // Fetch ICE servers (STUN + TURN) from backend
+        const iceServers = await fetchIceServers();
 
-        // TURN servers — required when both peers are behind symmetric NAT (laptop WiFi)
-        const turnUrl = import.meta.env.VITE_TURN_URL;
-        const turnUser = import.meta.env.VITE_TURN_USERNAME;
-        const turnCred = import.meta.env.VITE_TURN_CREDENTIAL;
-        if (turnUrl) {
-            // Support multiple TURN URLs separated by comma
-            const urls = turnUrl.split(',').map(u => u.trim());
-            iceServers.push({
-                urls,
-                username: turnUser || '',
-                credential: turnCred || '',
-            });
-        }
-
-        // Always add Metered TURN servers (free tier: 500GB/month)
-        // UDP + TCP + TLS transports for maximum NAT compatibility
-        iceServers.push(
-            {
-                urls: 'stun:stun.relay.metered.ca:80',
-            },
-            {
-                urls: 'turn:global.relay.metered.ca:80',
-                username: '83eebabf8b4cce9d5dbcb649',
-                credential: '2D7JvfkOQtBdYW3R',
-            },
-            {
-                urls: 'turn:global.relay.metered.ca:80?transport=tcp',
-                username: '83eebabf8b4cce9d5dbcb649',
-                credential: '2D7JvfkOQtBdYW3R',
-            },
-            {
-                urls: 'turn:global.relay.metered.ca:443',
-                username: '83eebabf8b4cce9d5dbcb649',
-                credential: '2D7JvfkOQtBdYW3R',
-            },
-            {
-                urls: 'turns:global.relay.metered.ca:443?transport=tcp',
-                username: '83eebabf8b4cce9d5dbcb649',
-                credential: '2D7JvfkOQtBdYW3R',
-            },
-        );
-
-        console.log('[Call] ICE servers configured:', iceServers.length, 'entries');
+        console.log('[Call] ICE servers configured:', iceServers.length, 'entries',
+            iceServers.filter(s => {
+                const u = Array.isArray(s.urls) ? s.urls[0] : s.urls;
+                return u?.startsWith('turn');
+            }).length, 'TURN');
 
         const peer = new SimplePeer({
             initiator,
