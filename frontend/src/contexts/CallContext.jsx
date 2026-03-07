@@ -99,19 +99,48 @@ export function CallProvider({ children }) {
         const SimplePeer = await getSimplePeer();
         console.log(`[Call] createPeer(initiator=${initiator}), target=${targetUserIdRef.current}`);
 
+        // Build ICE servers: STUN + TURN for NAT traversal
+        const iceServers = [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' },
+        ];
+
+        // TURN servers — required when both peers are behind NAT
+        const turnUrl = import.meta.env.VITE_TURN_URL;
+        const turnUser = import.meta.env.VITE_TURN_USERNAME;
+        const turnCred = import.meta.env.VITE_TURN_CREDENTIAL;
+        if (turnUrl) {
+            iceServers.push({
+                urls: turnUrl,
+                username: turnUser || '',
+                credential: turnCred || '',
+            });
+        } else {
+            // Free relay TURN servers as fallback
+            iceServers.push(
+                {
+                    urls: 'turn:openrelay.metered.ca:80',
+                    username: 'openrelayproject',
+                    credential: 'openrelayproject',
+                },
+                {
+                    urls: 'turn:openrelay.metered.ca:443',
+                    username: 'openrelayproject',
+                    credential: 'openrelayproject',
+                },
+                {
+                    urls: 'turns:openrelay.metered.ca:443?transport=tcp',
+                    username: 'openrelayproject',
+                    credential: 'openrelayproject',
+                },
+            );
+        }
+
         const peer = new SimplePeer({
             initiator,
             trickle: true,
             stream,
-            config: {
-                iceServers: [
-                    { urls: 'stun:stun.l.google.com:19302' },
-                    { urls: 'stun:stun1.l.google.com:19302' },
-                    { urls: 'stun:stun2.l.google.com:19302' },
-                    { urls: 'stun:stun3.l.google.com:19302' },
-                    { urls: 'stun:stun4.l.google.com:19302' },
-                ],
-            },
+            config: { iceServers },
         });
 
         peer.on('signal', (data) => {
@@ -145,13 +174,25 @@ export function CallProvider({ children }) {
 
         peer.on('error', (err) => {
             console.error('[Peer] Error:', err.message || err);
-            // Do NOT cleanup here — transient errors should not kill the call UI
         });
 
         peer.on('close', () => {
             console.log('[Peer] Connection closed');
-            // Only log — cleanup is handled by endCall/cancelCall actions
         });
+
+        // Monitor ICE connection state for failure detection
+        if (peer._pc) {
+            peer._pc.oniceconnectionstatechange = () => {
+                const state = peer._pc.iceConnectionState;
+                console.log('[Peer] ICE state:', state);
+                if (state === 'failed') {
+                    console.error('[Peer] ICE connection failed — likely no TURN server available');
+                    setCallError('Không thể kết nối. Kiểm tra mạng hoặc cấu hình TURN server.');
+                } else if (state === 'disconnected') {
+                    console.warn('[Peer] ICE disconnected — attempting reconnect...');
+                }
+            };
+        }
 
         peerRef.current = peer;
         return peer;
@@ -202,6 +243,10 @@ export function CallProvider({ children }) {
 
         const handleAccepted = async ({ userId: acceptedUserId }) => {
             console.log('[Call] Call accepted by', acceptedUserId, '| targetUserIdRef:', targetUserIdRef.current);
+            // Ensure targetUserIdRef points to the callee who accepted
+            if (acceptedUserId) {
+                targetUserIdRef.current = acceptedUserId;
+            }
             // Caller side: when callee accepts, create initiator peer
             try {
                 const stream = localStreamRef.current;
@@ -210,6 +255,7 @@ export function CallProvider({ children }) {
                     cleanup();
                     return;
                 }
+                setCallState((prev) => ({ ...prev, active: true }));
                 const peer = await createPeer(true, stream);
                 // Flush any buffered signals
                 while (pendingSignalsRef.current.length > 0) {
