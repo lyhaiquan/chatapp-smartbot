@@ -105,36 +105,49 @@ export function CallProvider({ children }) {
             { urls: 'stun:stun1.l.google.com:19302' },
         ];
 
-        // TURN servers — required when both peers are behind NAT
+        // TURN servers — required when both peers are behind symmetric NAT (laptop WiFi)
         const turnUrl = import.meta.env.VITE_TURN_URL;
         const turnUser = import.meta.env.VITE_TURN_USERNAME;
         const turnCred = import.meta.env.VITE_TURN_CREDENTIAL;
         if (turnUrl) {
+            // Support multiple TURN URLs separated by comma
+            const urls = turnUrl.split(',').map(u => u.trim());
             iceServers.push({
-                urls: turnUrl,
+                urls,
                 username: turnUser || '',
                 credential: turnCred || '',
             });
-        } else {
-            // Free relay TURN servers as fallback
-            iceServers.push(
-                {
-                    urls: 'turn:openrelay.metered.ca:80',
-                    username: 'openrelayproject',
-                    credential: 'openrelayproject',
-                },
-                {
-                    urls: 'turn:openrelay.metered.ca:443',
-                    username: 'openrelayproject',
-                    credential: 'openrelayproject',
-                },
-                {
-                    urls: 'turns:openrelay.metered.ca:443?transport=tcp',
-                    username: 'openrelayproject',
-                    credential: 'openrelayproject',
-                },
-            );
         }
+
+        // Always add Metered TURN servers (free tier: 500GB/month)
+        // UDP + TCP + TLS transports for maximum NAT compatibility
+        iceServers.push(
+            {
+                urls: 'stun:stun.relay.metered.ca:80',
+            },
+            {
+                urls: 'turn:global.relay.metered.ca:80',
+                username: '83eebabf8b4cce9d5dbcb649',
+                credential: '2D7JvfkOQtBdYW3R',
+            },
+            {
+                urls: 'turn:global.relay.metered.ca:80?transport=tcp',
+                username: '83eebabf8b4cce9d5dbcb649',
+                credential: '2D7JvfkOQtBdYW3R',
+            },
+            {
+                urls: 'turn:global.relay.metered.ca:443',
+                username: '83eebabf8b4cce9d5dbcb649',
+                credential: '2D7JvfkOQtBdYW3R',
+            },
+            {
+                urls: 'turns:global.relay.metered.ca:443?transport=tcp',
+                username: '83eebabf8b4cce9d5dbcb649',
+                credential: '2D7JvfkOQtBdYW3R',
+            },
+        );
+
+        console.log('[Call] ICE servers configured:', iceServers.length, 'entries');
 
         const peer = new SimplePeer({
             initiator,

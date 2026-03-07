@@ -23,6 +23,7 @@ export default function CallModal() {
 
     const localVideoRef = useRef(null);
     const remoteVideoRef = useRef(null);
+    const remoteAudioRef = useRef(null);
     const [audioMuted, setAudioMuted] = useState(false);
     const [videoOff, setVideoOff] = useState(false);
     const [callDuration, setCallDuration] = useState(0);
@@ -40,13 +41,27 @@ export default function CallModal() {
         }
     }, [localStream]);
 
-    // ── Attach remote stream — this is the critical fix ─────────
+    // ── Attach remote stream to video element (video calls) ────
     useEffect(() => {
         const el = remoteVideoRef.current;
         if (!el) return;
         if (remoteStream) {
             console.log('[CallModal] Assigning remoteStream to <video>, tracks:',
                 remoteStream.getTracks().map(t => `${t.kind}:${t.readyState}`).join(', '));
+            el.srcObject = remoteStream;
+            el.play().catch(() => { });
+        } else {
+            el.srcObject = null;
+        }
+    }, [remoteStream]);
+
+    // ── Attach remote stream to audio element (voice calls) ────
+    useEffect(() => {
+        const el = remoteAudioRef.current;
+        if (!el) return;
+        if (remoteStream) {
+            console.log('[CallModal] Assigning remoteStream to <audio>, tracks:',
+                remoteStream.getAudioTracks().map(t => `${t.kind}:${t.readyState}`).join(', '));
             el.srcObject = remoteStream;
             el.play().catch(() => { });
         } else {
@@ -93,6 +108,9 @@ export default function CallModal() {
     return (
         <div className="fixed inset-0 bg-black z-50 flex flex-col">
             <div className="flex-1 relative bg-gray-900">
+                {/* ─── Hidden audio element: ALWAYS rendered to play remote audio ─── */}
+                <audio ref={remoteAudioRef} autoPlay playsInline />
+
                 {/* ─── Remote video: ALWAYS rendered, never unmounted ─── */}
                 {isVideoCall && (
                     <video
