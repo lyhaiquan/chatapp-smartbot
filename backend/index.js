@@ -71,20 +71,36 @@ app.get('/api/ice-servers', async (req, res) => {
         const iceServers = [
             { urls: 'stun:stun.l.google.com:19302' },
             { urls: 'stun:stun1.l.google.com:19302' },
+            { urls: 'stun:stun2.l.google.com:19302' },
         ];
 
         // If Metered.ca API key is configured, fetch real TURN credentials
         const meteredApiKey = process.env.METERED_API_KEY;
         if (meteredApiKey) {
-            const response = await fetch(
-                `https://phucanh.metered.live/api/v1/turn/credentials?apiKey=${encodeURIComponent(meteredApiKey)}`
-            );
-            if (response.ok) {
-                const turnServers = await response.json();
-                iceServers.push(...turnServers);
-                console.log(`✅ Fetched ${turnServers.length} TURN servers from Metered.ca`);
-            } else {
-                console.warn('⚠️ Failed to fetch Metered TURN credentials:', response.status);
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 5000);
+            try {
+                const response = await fetch(
+                    `https://phucanh.metered.live/api/v1/turn/credentials?apiKey=${encodeURIComponent(meteredApiKey)}`,
+                    { signal: controller.signal }
+                );
+                clearTimeout(timeout);
+                if (response.ok) {
+                    const turnServers = await response.json();
+                    // Normalize: ensure each entry uses `urls` (not `url`)
+                    const normalized = turnServers.map(s => ({
+                        urls: s.urls || s.url,
+                        ...(s.username && { username: s.username }),
+                        ...(s.credential && { credential: s.credential }),
+                    })).filter(s => s.urls);
+                    iceServers.push(...normalized);
+                    console.log(`✅ Fetched ${normalized.length} TURN servers from Metered.ca`);
+                } else {
+                    console.warn('⚠️ Failed to fetch Metered TURN credentials:', response.status);
+                }
+            } catch (fetchErr) {
+                clearTimeout(timeout);
+                console.warn('⚠️ Metered API timeout/error:', fetchErr.message);
             }
         }
 
@@ -103,7 +119,6 @@ app.get('/api/ice-servers', async (req, res) => {
         res.json({ iceServers });
     } catch (error) {
         console.error('ICE servers error:', error.message);
-        // Return STUN-only as fallback
         res.json({
             iceServers: [
                 { urls: 'stun:stun.l.google.com:19302' },

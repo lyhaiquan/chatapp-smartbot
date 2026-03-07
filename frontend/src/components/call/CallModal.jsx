@@ -55,11 +55,13 @@ export default function CallModal() {
         }
     }, [remoteStream]);
 
-    // ── Attach remote stream to audio element (voice calls) ────
+    // ── Attach remote stream to audio element (voice calls only) ────
     useEffect(() => {
         const el = remoteAudioRef.current;
         if (!el) return;
-        if (remoteStream) {
+        const isVideo = callState.callType === 'video';
+        // Only use <audio> for non-video calls; video element handles audio too
+        if (remoteStream && !isVideo) {
             console.log('[CallModal] Assigning remoteStream to <audio>, tracks:',
                 remoteStream.getAudioTracks().map(t => `${t.kind}:${t.readyState}`).join(', '));
             el.srcObject = remoteStream;
@@ -67,7 +69,7 @@ export default function CallModal() {
         } else {
             el.srcObject = null;
         }
-    }, [remoteStream]);
+    }, [remoteStream, callState.callType]);
 
     // ── Call timer ──────────────────────────────────────────────
     useEffect(() => {

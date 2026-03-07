@@ -14,37 +14,12 @@ const getSimplePeer = async () => {
     return SimplePeerClass;
 };
 
-// ── Fetch ICE servers from backend (cached) ──────────────────────
-let cachedIceServers = null;
-let iceServersFetchedAt = 0;
-const ICE_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-
-const fetchIceServers = async () => {
-    // Return cache if still fresh
-    if (cachedIceServers && (Date.now() - iceServersFetchedAt) < ICE_CACHE_TTL) {
-        return cachedIceServers;
-    }
-    try {
-        const apiBase = import.meta.env.VITE_API_URL || '/api';
-        const res = await fetch(`${apiBase}/ice-servers`);
-        if (res.ok) {
-            const data = await res.json();
-            if (data.iceServers?.length > 0) {
-                cachedIceServers = data.iceServers;
-                iceServersFetchedAt = Date.now();
-                console.log('[Call] Fetched ICE servers from backend:', data.iceServers.length, 'entries');
-                return data.iceServers;
-            }
-        }
-    } catch (err) {
-        console.warn('[Call] Failed to fetch ICE servers from backend:', err.message);
-    }
-    // Fallback: STUN only
-    return [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' },
-    ];
-};
+// ── Default ICE servers (STUN only — always works) ───────────────
+const DEFAULT_ICE_SERVERS = [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
+];
 
 export function CallProvider({ children }) {
     const { on, off, emit } = useSocket();
@@ -72,9 +47,45 @@ export function CallProvider({ children }) {
     const [remoteStream, setRemoteStream] = useState(null);
     const [callError, setCallError] = useState(null);
 
+    // Pre-fetched ICE servers (STUN + TURN) — filled on mount
+    const iceServersRef = useRef(DEFAULT_ICE_SERVERS);
+
     // Preload SimplePeer on mount
     useEffect(() => {
         getSimplePeer().catch(() => { });
+    }, []);
+
+    // Pre-fetch ICE servers from backend on mount (non-blocking)
+    useEffect(() => {
+        const fetchIceServers = async () => {
+            try {
+                const apiBase = import.meta.env.VITE_API_URL || '/api';
+                const controller = new AbortController();
+                const timeout = setTimeout(() => controller.abort(), 5000);
+                const res = await fetch(`${apiBase}/ice-servers`, {
+                    signal: controller.signal,
+                });
+                clearTimeout(timeout);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.iceServers?.length > 0) {
+                        // Ensure STUN servers are always first
+                        const hasStun = data.iceServers.some(s => {
+                            const u = Array.isArray(s.urls) ? s.urls[0] : s.urls;
+                            return u?.startsWith('stun:');
+                        });
+                        if (!hasStun) {
+                            data.iceServers.unshift(...DEFAULT_ICE_SERVERS);
+                        }
+                        iceServersRef.current = data.iceServers;
+                        console.log('[Call] Pre-fetched ICE servers:', data.iceServers.length, 'entries');
+                    }
+                }
+            } catch (err) {
+                console.warn('[Call] ICE server fetch failed (using STUN-only):', err.message);
+            }
+        };
+        fetchIceServers();
     }, []);
 
     // ---- Helpers ----
@@ -131,10 +142,10 @@ export function CallProvider({ children }) {
         const SimplePeer = await getSimplePeer();
         console.log(`[Call] createPeer(initiator=${initiator}), target=${targetUserIdRef.current}`);
 
-        // Fetch ICE servers (STUN + TURN) from backend
-        const iceServers = await fetchIceServers();
+        // Use pre-fetched ICE servers (already available — no network delay)
+        const iceServers = iceServersRef.current;
 
-        console.log('[Call] ICE servers configured:', iceServers.length, 'entries',
+        console.log('[Call] ICE servers:', iceServers.length, 'entries',
             iceServers.filter(s => {
                 const u = Array.isArray(s.urls) ? s.urls[0] : s.urls;
                 return u?.startsWith('turn');
