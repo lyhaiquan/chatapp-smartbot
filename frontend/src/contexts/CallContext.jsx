@@ -211,7 +211,7 @@ export function CallProvider({ children }) {
 
         peerRef.current = peer;
         return peer;
-    }, [emit, cleanup]);
+    }, [emit]);
 
     // ---- Socket listeners ----
     useEffect(() => {
@@ -349,6 +349,8 @@ export function CallProvider({ children }) {
 
     // ---- Actions ----
     const initiateCall = useCallback(async (roomId, targetUserId, callType = 'video', targetUserName = '') => {
+        // Guard: prevent starting a second call while one is active/pending
+        if (callState.active || callState.outgoing || callState.incoming) return;
         try {
             console.log('[Call] initiateCall:', { roomId, targetUserId, callType, targetUserName });
             const stream = await getMediaStream(callType);
@@ -366,7 +368,7 @@ export function CallProvider({ children }) {
         } catch (err) {
             console.error('[Call] initiateCall failed:', err);
         }
-    }, [emit, user, getMediaStream]);
+    }, [emit, user, getMediaStream, callState.active, callState.outgoing, callState.incoming]);
 
     const acceptCall = useCallback(async () => {
         // Guard against double-click

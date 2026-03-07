@@ -252,7 +252,7 @@ module.exports = (io, socket) => {
     });
 
     // ─── Cleanup khi disconnect ────────────────────────────────────────
-    socket.on('disconnect', () => {
+    socket.on('disconnect', async () => {
         // Tìm và cleanup calls mà user đang tham gia
         for (const [roomId, call] of activeCalls.entries()) {
             if (call.participants.includes(userId)) {
@@ -260,11 +260,18 @@ module.exports = (io, socket) => {
                 if (call.participants.length === 0) {
                     activeCalls.delete(roomId);
                 } else {
-                    socket.to(roomId).emit('call:participant-left', {
-                        roomId,
-                        userId,
-                        username: socket.user.username,
-                    });
+                    // Notify remaining participants via their socketId
+                    for (const pid of call.participants) {
+                        const pSocketId = await getSocketId(pid);
+                        if (pSocketId) {
+                            io.to(pSocketId).emit('call:ended', {
+                                roomId,
+                                userId,
+                                reason: 'participant-disconnected',
+                            });
+                        }
+                    }
+                    activeCalls.delete(roomId);
                 }
             }
         }

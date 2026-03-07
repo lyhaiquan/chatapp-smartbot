@@ -100,7 +100,7 @@ export default function ChatWindow({ roomId, onBack }) {
     };
 
     const handleCall = (type) => {
-        if (display.otherUserId) {
+        if (display.otherUserId && !callState.active && !callState.outgoing && !callState.incoming) {
             initiateCall(roomId, display.otherUserId, type, display.name);
         }
     };

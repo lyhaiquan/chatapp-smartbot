@@ -67,12 +67,12 @@ export default function CallModal() {
         }
     }, [remoteStream]);
 
-    // ── Call timer ──────────────────────────────────────────────
+    // ── Call timer — starts only when remote stream arrives ────
     useEffect(() => {
-        if (!callState.active) return;
+        if (!callState.active || !remoteStream) return;
         const interval = setInterval(() => setCallDuration((d) => d + 1), 1000);
         return () => { clearInterval(interval); setCallDuration(0); };
-    }, [callState.active]);
+    }, [callState.active, remoteStream]);
 
     // ── 10s connection timeout warning ──────────────────────────
     useEffect(() => {
