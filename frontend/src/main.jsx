@@ -13,7 +13,12 @@ import { Buffer } from 'buffer';
 
 if (typeof window !== 'undefined') {
   window.Buffer = Buffer;
-  window.process = { env: {} };
+  if (!window.process || !window.process.nextTick) {
+    window.process = Object.assign({}, window.process, {
+      env: {},
+      nextTick: function (fn) { setTimeout(fn, 0); },
+    });
+  }
 }
 
 import { StrictMode } from 'react';
