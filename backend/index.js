@@ -80,26 +80,29 @@ app.get('/api/ice-servers', async (req, res) => {
             { urls: 'stun:stun2.l.google.com:19302' },
         ];
 
+        let hasTurn = false;
+
         // If Metered.ca API key is configured, fetch real TURN credentials
         const meteredApiKey = process.env.METERED_API_KEY;
+        const meteredDomain = process.env.METERED_DOMAIN || 'smart-ai-chat.metered.live';
         if (meteredApiKey) {
             const controller = new AbortController();
             const timeout = setTimeout(() => controller.abort(), 5000);
             try {
                 const response = await fetch(
-                    `https://phucanh.metered.live/api/v1/turn/credentials?apiKey=${encodeURIComponent(meteredApiKey)}`,
+                    `https://${meteredDomain}/api/v1/turn/credentials?apiKey=${encodeURIComponent(meteredApiKey)}`,
                     { signal: controller.signal }
                 );
                 clearTimeout(timeout);
                 if (response.ok) {
                     const turnServers = await response.json();
-                    // Normalize: ensure each entry uses `urls` (not `url`)
                     const normalized = turnServers.map(s => ({
                         urls: s.urls || s.url,
                         ...(s.username && { username: s.username }),
                         ...(s.credential && { credential: s.credential }),
                     })).filter(s => s.urls);
                     iceServers.push(...normalized);
+                    hasTurn = normalized.length > 0;
                     console.log(`✅ Fetched ${normalized.length} TURN servers from Metered.ca`);
                 } else {
                     console.warn('⚠️ Failed to fetch Metered TURN credentials:', response.status);
@@ -108,6 +111,42 @@ app.get('/api/ice-servers', async (req, res) => {
                 clearTimeout(timeout);
                 console.warn('⚠️ Metered API timeout/error:', fetchErr.message);
             }
+        }
+
+        // Fallback: Open Relay free TURN servers (static auth)
+        if (!hasTurn) {
+            const crypto = require('crypto');
+            const unixTimestamp = Math.floor(Date.now() / 1000) + 24 * 3600; // expires in 24h
+            const username = `${unixTimestamp}:openrelayproject`;
+            const hmac = crypto.createHmac('sha1', 'openrelayprojectsecret');
+            hmac.update(username);
+            const credential = hmac.digest('base64');
+
+            iceServers.push(
+                { urls: 'stun:stun.relay.metered.ca:80' },
+                {
+                    urls: 'turn:global.relay.metered.ca:80',
+                    username,
+                    credential,
+                },
+                {
+                    urls: 'turn:global.relay.metered.ca:80?transport=tcp',
+                    username,
+                    credential,
+                },
+                {
+                    urls: 'turn:global.relay.metered.ca:443',
+                    username,
+                    credential,
+                },
+                {
+                    urls: 'turns:global.relay.metered.ca:443?transport=tcp',
+                    username,
+                    credential,
+                }
+            );
+            hasTurn = true;
+            console.log('✅ Using Open Relay free TURN servers (static auth)');
         }
 
         // Manual TURN server from env vars
