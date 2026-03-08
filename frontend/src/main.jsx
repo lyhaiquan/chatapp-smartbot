@@ -9,6 +9,13 @@
  *   2. No circular dependency between routing and auth
  *   3. 401 logout events reset React state before navigation
  */
+import { Buffer } from 'buffer';
+
+if (typeof window !== 'undefined') {
+  window.Buffer = Buffer;
+  window.process = { env: {} };
+}
+
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
