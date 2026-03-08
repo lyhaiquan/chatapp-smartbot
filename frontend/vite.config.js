@@ -12,10 +12,11 @@ export default defineConfig({
       events: 'events',
       buffer: 'buffer',
       process: 'process/browser',
+      stream: 'readable-stream',
     },
   },
   optimizeDeps: {
-    include: ['buffer', 'events', 'process/browser', 'simple-peer'],
+    include: ['buffer', 'events', 'process/browser', 'readable-stream', 'simple-peer'],
   },
   server: {
     proxy: {
