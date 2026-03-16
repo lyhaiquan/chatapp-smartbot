@@ -178,7 +178,7 @@ const startServer = async () => {
         // 1. Kết nối MongoDB
         await connectDB();
 
-        // 2. Khởi tạo Gemini AI
+        // 2. Khởi tạo Groq AI
         initAI();
 
         // 3. Khởi tạo Socket.io handlers

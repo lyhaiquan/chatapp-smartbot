@@ -11,7 +11,7 @@ const { translateBatch } = require('./ai.service');
  * 2. Filter: chỉ dịch cho members có preferredLanguage ≠ senderLanguage
  * 3. Nhóm theo ngôn ngữ đích (N users cùng ngôn ngữ = 1 lần gọi API)
  * 4. Kiểm tra cache: nếu message đã có bản dịch cho ngôn ngữ đó → skip
- * 5. Gọi Gemini API dịch song song (Promise.allSettled, có retry)
+ * 5. Gọi Groq API dịch song song (Promise.allSettled, có retry)
  * 6. Lưu translations[] vào Message document (persistent cache)
  * 7. Emit 'message:translated' RIÊNG cho từng user qua socketId
  */
@@ -61,7 +61,7 @@ const translateForRoom = async (io, roomId, messageId, content, senderLanguage) 
 
         console.log(`🌐 Translating "${content.substring(0, 40)}..." → [${targetLanguages.join(', ')}]`);
 
-        // 5. Gọi Gemini API dịch song song
+        // 5. Gọi Groq API dịch song song
         const newTranslations = await translateBatch(content, targetLanguages, senderLanguage);
 
         if (newTranslations.length === 0) {

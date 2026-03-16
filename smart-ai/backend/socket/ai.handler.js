@@ -79,7 +79,7 @@ module.exports = (io, socket) => {
                     aiMetadata: {
                         isAIResponse: true,
                         prompt: `summarize last ${messageCount} messages`,
-                        model: 'gemini-2.5-flash',
+                        model: 'llama-3.3-70b-versatile',
                     },
                     createdAt: new Date(),
                 };
@@ -140,7 +140,7 @@ module.exports = (io, socket) => {
                 aiMetadata: {
                     isAIResponse: true,
                     prompt: message.substring(0, 200),
-                    model: 'gemini-2.5-flash',
+                    model: 'llama-3.3-70b-versatile',
                 },
                 createdAt: new Date(),
             };
@@ -179,7 +179,7 @@ module.exports = (io, socket) => {
     });
 
     // ─── ai:summarize-call ──────────────────────────────────────────────
-    // Summarize a recorded call using Gemini audio understanding
+    // Summarize a recorded call using Groq AI
     socket.on('ai:summarize-call', async ({ roomId, audioBase64, mimeType }) => {
         try {
             if (!roomId || !audioBase64) {
@@ -196,7 +196,7 @@ module.exports = (io, socket) => {
                     room: roomId,
                     type: 'ai-response',
                     content: `📞 **Tóm tắt cuộc gọi**\n\n${summary}`,
-                    aiMetadata: { isAIResponse: true, model: 'gemini-2.5-flash' },
+                    aiMetadata: { isAIResponse: true, model: 'llama-3.3-70b-versatile' },
                     createdAt: new Date(),
                 };
                 socket.emit('ai:chat-response', { roomId, message: tempMessage });
@@ -213,7 +213,7 @@ module.exports = (io, socket) => {
     });
 
     // ─── ai:analyze-screen ────────────────────────────────────────────────
-    // Analyze a screenshot from screen sharing using Gemini vision
+    // Analyze a screenshot from screen sharing using Groq AI
     socket.on('ai:analyze-screen', async ({ roomId, imageBase64 }) => {
         try {
             if (!roomId || !imageBase64) {
@@ -233,7 +233,7 @@ module.exports = (io, socket) => {
                     room: roomId,
                     type: 'ai-response',
                     content: `💻 **Phân tích màn hình**\n\n${analysis}`,
-                    aiMetadata: { isAIResponse: true, model: 'gemini-2.5-flash' },
+                    aiMetadata: { isAIResponse: true, model: 'llama-3.3-70b-versatile' },
                     createdAt: new Date(),
                 };
                 socket.emit('ai:chat-response', { roomId, message: tempMessage });
