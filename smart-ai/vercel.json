@@ -1,0 +1,30 @@
+{
+  "buildCommand": "cd frontend && npm install && npm run build",
+  "outputDirectory": "frontend/dist",
+  "installCommand": "echo 'skip root install'",
+  "framework": null,
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "https://YOUR-BACKEND.onrender.com/api/$1",
+      "headers": {
+        "x-forwarded-host": "$host"
+      }
+    },
+    {
+      "src": "/socket.io/(.*)",
+      "dest": "https://YOUR-BACKEND.onrender.com/socket.io/$1"
+    },
+    {
+      "src": "/uploads/(.*)",
+      "dest": "https://YOUR-BACKEND.onrender.com/uploads/$1"
+    },
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ]
+}

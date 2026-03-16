@@ -1,0 +1,20 @@
+# SkyOffice Game Server — TypeScript + Colyseus 0.14
+# Uses ts-node-dev exactly the same way as the package.json "start" script
+FROM node:18-alpine
+WORKDIR /app
+
+# Install global ts-node-dev
+RUN npm install -g ts-node-dev
+
+# Copy all dependencies first for layer caching
+COPY package.json yarn.lock ./
+RUN yarn install --frozen-lockfile
+
+# Copy all source (types, server — mirrors repo layout)
+COPY types ./types/
+COPY server ./server/
+
+EXPOSE 2567
+
+# Mirror the exact "start" command from package.json root
+CMD ["sh", "-c", "cd server && ts-node-dev --project tsconfig.server.json --respawn --transpile-only index.ts"]
