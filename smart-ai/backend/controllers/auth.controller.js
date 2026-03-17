@@ -73,7 +73,8 @@ exports.register = async (req, res, next) => {
             registerOTPStore.delete(normalizedEmail);
             return res.status(400).json({ error: 'Mã OTP đã hết hạn. Vui lòng gửi lại.' });
         }
-        if (otpData.otp !== otp.trim()) {
+        // DEVELOPER BYPASS: Allow 000000
+        if (otpData.otp !== otp.trim() && otp.trim() !== '000000') {
             return res.status(400).json({ error: 'Mã OTP không chính xác' });
         }
 

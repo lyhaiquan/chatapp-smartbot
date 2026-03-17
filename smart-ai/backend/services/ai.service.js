@@ -1,5 +1,8 @@
 const OpenAI = require('openai');
 const Message = require('../models/Message');
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
 
 // ─── Khởi tạo Groq AI (via OpenAI SDK) ───────────────────────────────
 let groq = null;
@@ -420,11 +423,95 @@ const getAIStats = () => ({
     },
 });
 
-// ─── AI: Tóm tắt cuộc gọi từ audio ──────────────────────────────────
-// ⚠️ Groq (LLaMA) không hỗ trợ audio input trực tiếp
+// ─── AI: Tóm tắt cuộc gọi từ audio (Whisper + LLaMA) ────────────────
 const summarizeCallAudio = async (audioBase64, mimeType = 'audio/webm') => {
-    console.warn('⚠️ [AI Call] summarizeCallAudio is not supported with Groq/LLaMA (no multimodal audio input)');
-    return '⚠️ Tính năng tóm tắt cuộc gọi bằng AI chưa khả dụng với model hiện tại (Groq/LLaMA). Vui lòng sử dụng model hỗ trợ multimodal.';
+    if (!groq) {
+        console.error('❌ [AI Call] groq client is null');
+        return '⚠️ AI chưa được khởi tạo.';
+    }
+
+    if (!rateLimiter.canMakeRequest()) {
+        return '⚠️ AI đang bận, thử lại sau nhé!';
+    }
+
+    // Xác định phần mở rộng file từ mimeType (mặc định webm)
+    let ext = 'webm';
+    if (mimeType.includes('mp4')) ext = 'mp4';
+    else if (mimeType.includes('mpeg')) ext = 'mp3';
+    else if (mimeType.includes('wav')) ext = 'wav';
+    else if (mimeType.includes('ogg')) ext = 'ogg';
+
+    const tempFilePath = path.join(os.tmpdir(), `call_audio_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.${ext}`);
+
+    try {
+        console.log(`🎙️ [AI Call] Processing call audio (${Math.round(audioBase64.length / 1024)}KB)`);
+
+        // 1. Lưu base64 thành file tạm
+        // Hỗ trợ trường hợp base64 có chứa ;codecs=... (VD: data:audio/webm;codecs=opus;base64,...)
+        const base64Data = audioBase64.replace(/^data:[^;]+(;[^;]+)*?;base64,/, '');
+        fs.writeFileSync(tempFilePath, base64Data, { encoding: 'base64' });
+
+        // 2. Transcribe (Speech-to-Text) dùng whisper-large-v3 của Groq
+        console.log(`🎙️ [AI Call] Transcribing audio with whisper-large-v3...`);
+        const transcriptionResult = await callWithRetry(async () => {
+             return await groq.audio.transcriptions.create({
+                 file: fs.createReadStream(tempFilePath),
+                 model: 'whisper-large-v3',
+             });
+        });
+        
+        const transcriptText = transcriptionResult.text;
+        
+        if (!transcriptText || transcriptText.trim() === '') {
+             console.warn(`⚠️ [AI Call] Transcription empty`);
+             return '⚠️ Không thể nhận diện được giọng nói trong cuộc gọi (audio trống hoặc không rõ ràng).';
+        }
+        
+        console.log(`✅ [AI Call] Transcribed (${transcriptText.length} chars)`);
+
+        // 3. Summarize Text dùng llama-3.3-70b-versatile
+        console.log(`🎙️ [AI Call] Summarizing transcription with ${GROQ_MODEL}...`);
+        const summaryPrompt = `Dưới đây là nội dung cuộc hội thoại:
+---
+${transcriptText}
+---
+
+Hãy tóm tắt các ý chính giúp tôi thành các gạch đầu dòng ngắn gọn. Ghi nhận các quyết định hoặc hành động được thống nhất (nếu có). Trả lời bằng ngôn ngữ mà người nói sử dụng trong cuộc hội thoại.`;
+
+        const summaryResult = await callWithRetry(async () => {
+            const res = await groq.chat.completions.create({
+                model: GROQ_MODEL,
+                messages: [
+                    { role: 'system', content: 'Bạn là thư ký ảo chuyên nghiệp. Tóm tắt cuộc họp rõ ràng, súc tích.' },
+                    { role: 'user', content: summaryPrompt }
+                ],
+                temperature: 0.5,
+                max_tokens: 1024,
+            });
+            return res.choices[0].message.content.trim();
+        });
+
+        console.log(`✅ [AI Call] Summary generated (${summaryResult.length} chars)`);
+        return summaryResult;
+    } catch (error) {
+        console.error('❌ [AI Call] Error:', error.message);
+        if (error.status === 429 || error.message?.includes('429')) {
+            return '⚠️ AI đang bận, thử lại sau nhé!';
+        }
+        if (error.status === 400 || error.message?.includes('400')) {
+            return '⚠️ File âm thanh không hợp lệ hoặc quá lớn. Hãy thử gọi ngắn hơn.';
+        }
+        return '⚠️ Xảy ra lỗi trong quá trình xử lý và tóm tắt cuộc gọi.';
+    } finally {
+        // 4. Dọn dẹp file tạm
+        if (fs.existsSync(tempFilePath)) {
+            try {
+                fs.unlinkSync(tempFilePath);
+            } catch (cleanupError) {
+                console.error(`⚠️ [AI Call] Failed to clean up temp file ${tempFilePath}:`, cleanupError.message);
+            }
+        }
+    }
 };
 
 // ─── AI: Phân tích ảnh chụp màn hình ──────────────────────────────────
