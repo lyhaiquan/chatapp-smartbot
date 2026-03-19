@@ -50,8 +50,16 @@ services:
       context: ./SkyOffice
       dockerfile: Dockerfile.client
       args:
-        # Nginx reverse-proxies matchmaking + WS to skyoffice-server
-        - VITE_SERVER_URL=ws://localhost:3000
+        # Browser connects directly to published Colyseus server port
+        - VITE_SERVER_URL=${VITE_SERVER_URL:-ws://localhost:2567}
+        # Optional: custom PeerJS signaling server (leave empty to use PeerJS cloud)
+        - VITE_PEERJS_HOST=${VITE_PEERJS_HOST:-}
+        - VITE_PEERJS_PORT=${VITE_PEERJS_PORT:-}
+        - VITE_PEERJS_PATH=${VITE_PEERJS_PATH:-}
+        - VITE_PEERJS_SECURE=${VITE_PEERJS_SECURE:-}
+        # JSON string, example:
+        # [{"urls":"stun:stun.l.google.com:19302"},{"urls":"turn:global.relay.metered.ca:80","username":"u","credential":"p"}]
+        - VITE_WEBRTC_ICE_SERVERS=${VITE_WEBRTC_ICE_SERVERS:-}
     ports:
       - "3000:80"
     depends_on:

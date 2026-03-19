@@ -2,6 +2,7 @@ import Peer from 'peerjs'
 import Network from '../services/Network'
 import store from '../stores'
 import { setVideoConnected } from '../stores/UserStore'
+import { getPeerOptions } from './peerConfig'
 
 export default class WebRTC {
   private myPeer: Peer
@@ -15,7 +16,7 @@ export default class WebRTC {
 
   constructor(userId: string, network: Network) {
     const sanitizedId = this.replaceInvalidId(userId)
-    this.myPeer = new Peer(sanitizedId)
+    this.myPeer = new Peer(sanitizedId, getPeerOptions())
     this.network = network
     console.log('userId:', userId)
     console.log('sanitizedId:', sanitizedId)

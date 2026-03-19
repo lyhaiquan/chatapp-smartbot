@@ -5,9 +5,14 @@ FROM node:18-alpine AS builder
 
 WORKDIR /app
 
-# Nhận biến môi trường cho Vite (WebSocket server)
-ARG VITE_SERVER_URL
+# ── Accept build args and expose them as ENV for Vite ──────────────────
+ARG VITE_SERVER_URL=ws://localhost:2567
 ENV VITE_SERVER_URL=${VITE_SERVER_URL}
+ENV VITE_PEERJS_HOST=${VITE_PEERJS_HOST}
+ENV VITE_PEERJS_PORT=${VITE_PEERJS_PORT}
+ENV VITE_PEERJS_PATH=${VITE_PEERJS_PATH}
+ENV VITE_PEERJS_SECURE=${VITE_PEERJS_SECURE}
+ENV VITE_WEBRTC_ICE_SERVERS=${VITE_WEBRTC_ICE_SERVERS}
 
 # Cài dependencies cho types
 COPY types/package.json types/yarn.lock ./types/
@@ -48,3 +53,4 @@ RUN printf 'server {\n\
 EXPOSE 80
 
 CMD ["nginx", "-g", "daemon off;"]
+

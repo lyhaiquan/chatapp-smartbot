@@ -1,5 +1,17 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: 'FVF Fernando 08';
+  src: url('./assets/fonts/FVF_Fernando_08.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+html, body {
+  font-family: 'FVF Fernando 08', monospace, sans-serif !important;
+}
+
 /* ─── Theme CSS Custom Properties (defaults = Blue theme) ─── */
 :root {
   --color-primary: #2563eb;
@@ -160,4 +172,9 @@ html.theme-dark .shadow-lg {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* ─── Global Hacks (Per User Request) ─── */
+* {
+  border-radius: 0 !important;
 }

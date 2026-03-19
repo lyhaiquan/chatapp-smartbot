@@ -1,2 +1,44 @@
 # Moved from project root for deployment organization
 # ...existing content from original render.yaml will be placed here...
+services:
+  - type: web
+    name: smart-ai-backend
+    runtime: docker
+    rootDir: smart-ai/backend
+    dockerfilePath: smart-ai/backend/Dockerfile
+    dockerContext: smart-ai/backend
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+
+  - type: web
+    name: skyoffice-server
+    runtime: docker
+    rootDir: SkyOffice
+    dockerfilePath: SkyOffice/Dockerfile.server
+    dockerContext: SkyOffice
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 2567
+
+  - type: web
+    name: skyoffice-client
+    runtime: docker
+    rootDir: SkyOffice
+    dockerfilePath: SkyOffice/Dockerfile.client
+    dockerContext: SkyOffice
+    envVars:
+      - key: VITE_SERVER_URL
+        sync: false
